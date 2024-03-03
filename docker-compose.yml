@@ -1,0 +1,32 @@
+version: '3'
+
+services:
+  api01: &api
+    image: felipph/nodejs-rinha
+    build: .
+    volumes:
+      - ./src/server.js:/usr/app/server.js
+    command: node server.js
+    deploy:
+      resources:
+        limits:
+          cpus: "0.3"
+          memory: "200MB"
+    ports:
+      - '3000:3000'
+  database:
+    container_name: database
+    image: mysql
+    restart: always
+    ports:
+      - '3306:3306'
+    volumes:
+      - ./banco.sql:/docker-entrypoint-initdb.d/01-database.sql
+    environment:
+      - MYSQL_ROOT_PASSWORD=root
+      - MYSQL_DATABASE=rinha
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: "300MB"
