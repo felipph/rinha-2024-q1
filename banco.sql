@@ -1,6 +1,3 @@
-drop database if exists rinha;
-create database rinha;
-
 use rinha;
 
 create table transacoes (
@@ -32,11 +29,13 @@ INSERT INTO clientes VALUES
     (5, 'Cliente 5', 500000,0);
 
 DROP PROCEDURE IF EXISTS DO_TRANS;
+
+DELIMITER $$
 CREATE PROCEDURE  DO_TRANS(
     IN p_cliente_id int,
     IN p_tipo char,
     IN p_valor int signed,
-    IN p_descricao varchar(10)
+    IN p_descricao text
 )
 BEGIN
     DECLARE v_limite int signed;
@@ -45,7 +44,7 @@ BEGIN
     DECLARE EXIT HANDLER FOR SQLEXCEPTION
     BEGIN
         GET DIAGNOSTICS CONDITION 1 @p1 = RETURNED_SQLSTATE, @p2 = MESSAGE_TEXT, @p3 = MYSQL_ERRNO;
-        SELECT @p1 as p_cod,@p2 as p_msg, @p3 p_status;
+        SELECT @p1 as p_cod,@p2 as p_msg, '403' p_status;
     END;
 
     -- obtendo o saldo e o limite
@@ -58,20 +57,32 @@ BEGIN
         MYSQL_ERRNO = 404;
     end if;
 
+
+    if(p_tipo != 'c' AND p_tipo != 'd') then
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'transacao invalida',
+        MYSQL_ERRNO = 403;
+    end if;
+
     -- verificando se estoura o saldo
     if p_tipo = 'd' and v_saldo - p_valor < (v_limite * -1) then
         SIGNAL SQLSTATE '45000'
         SET MESSAGE_TEXT = 'transacao invalida',
         MYSQL_ERRNO = 403;
     end if;
+
+    if p_tipo = 'c' then
+        set p_valor = p_valor * -1;
+    end if;
+
     set v_saldo = v_saldo - p_valor;
     -- persistindo a transacao e atualizando o saldo
     update clientes
         set saldo = saldo - p_valor
     where cliente_id = p_cliente_id;
-    select v_saldo, v_limite;
     insert into transacoes(cliente_id, valor, descricao, tipo, saldo, limite, data_hora_inclusao) values
-    (p_cliente_id, p_valor, p_descricao,p_tipo, v_saldo, v_limite, current_timestamp);
+    (p_cliente_id,abs( p_valor), p_descricao,p_tipo, v_saldo, v_limite, current_timestamp);
     COMMIT;
     SELECT 0 as p_cod, 'OK' as p_msg, 200 p_status, v_saldo saldo, v_limite limite ;
-END;
+END$$
+delimiter ;

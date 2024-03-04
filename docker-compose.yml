@@ -2,20 +2,46 @@ version: '3'
 
 services:
   api01: &api
-    image: felipph/nodejs-rinha
+    hostname: api01
+    restart: always
+    ports:
+      - "3000:3000"
+    image: felipph/nodejs-rinha24q1
     build: .
+    depends_on:
+      - database
     volumes:
       - ./src/server.js:/usr/app/server.js
     command: node server.js
     deploy:
       resources:
         limits:
-          cpus: "0.3"
-          memory: "200MB"
+          cpus: "0.35"
+          memory: "150MB"
+  api02:
+    # Essa sintaxe reusa o que foi declarado em 'api01'.
+    <<: *api 
+    hostname: api02
     ports:
-      - '3000:3000'
+      - "3001:3000"  
+  proxy:
+    hostname: proxy
+    image: haproxy
+    restart: always
+    ports:
+      - "9999:80"
+    volumes:
+      - ./haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg
+    depends_on:
+      - api01
+      - api02
+    deploy:
+      resources:
+        limits:
+          cpus: "0.2"
+          memory: "50MB"
   database:
-    container_name: database
+    hostname: database
     image: mysql
     restart: always
     ports:
@@ -28,5 +54,10 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.5"
-          memory: "300MB"
+          cpus: "0.6"
+          memory: "200MB"
+
+# networks:
+#   default:
+#     driver: bridge
+#     name: rinha-nginx-2024q1

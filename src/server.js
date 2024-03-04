@@ -6,7 +6,7 @@ const webserver = new HyperExpress.Server({
 const mysql = require("mysql2");
 
 const connection = mysql.createPool({
-  host: "localhost",
+  host: "database",
   user: "root",
   password: "root",
   database: "rinha",
@@ -28,6 +28,10 @@ async function handle_transacao(request, response) {
   connection.query(
     `call DO_TRANS('${id}', '${body.tipo}', '${body.valor}', '${body.descricao}')`,
     await function (err, results, fields) {
+      if(err) {
+        response.status(403).send('{}');
+        return;
+      }
       response.status(results[0][0].p_status);
       if (err == null && results[0][0].p_status == "200") {
         response.send(
@@ -77,7 +81,7 @@ async function handle_extrato(request, response) {
 
         response.status(200).send(JSON.stringify(saida));
       } else {
-        response.status(403).send("{}");
+        response.status(404).send("{}");
       }
     }
   );
