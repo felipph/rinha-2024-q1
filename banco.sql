@@ -1,5 +1,10 @@
 use rinha;
 
+CREATE USER 'rinha'@'%' IDENTIFIED BY 'SuperPass@@';
+
+grant all privileges on rinha.* to 'rinha'@'%' with grant option;
+flush privileges;
+
 create table transacoes (
     cliente_id int,
     valor numeric not null,
@@ -44,7 +49,7 @@ BEGIN
     DECLARE EXIT HANDLER FOR SQLEXCEPTION
     BEGIN
         GET DIAGNOSTICS CONDITION 1 @p1 = RETURNED_SQLSTATE, @p2 = MESSAGE_TEXT, @p3 = MYSQL_ERRNO;
-        SELECT @p1 as p_cod,@p2 as p_msg, '403' p_status;
+        SELECT @p1 as p_cod,@p2 as p_msg, '422' p_status, v_saldo saldo, v_limite limite;
     END;
 
     -- obtendo o saldo e o limite
