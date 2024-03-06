@@ -22,26 +22,29 @@ function handle_index(request, response) {
 }
 
 async function handle_transacao(request, response) {
+  console.log("Transacao");
   let id = request.path_parameters.id;
   body = await request.json();
+  console.log("Transacao: " + JSON.stringify(body));
   saida = {};
   connection.query(
     `call DO_TRANS('${id}', '${body.tipo}', '${body.valor}', '${body.descricao}')`,
     await function (err, results, fields) {
       if(err) {
-        response.status(403).send('{}');
+        response.status(422).send('{}');
         return;
-      }
-      response.status(results[0][0].p_status);
-      if (err == null && results[0][0].p_status == "200") {
-        response.send(
-          '{"limite": ' +
-            results[0][0].limite +
-            ', "saldo": ' +
-            results[0][0].saldo +
-            "}"
-        );
+      }      
+      if (err == null && results.length > 0) {
+        response.status(results[0][0].p_status);
+        saida =  '{"limite": ' +
+        results[0][0].limite +
+        ', "saldo": ' +
+        results[0][0].saldo +
+        "}";
+        response.send(saida);
+        console.log("Transacao: " + JSON.stringify(saida));
       } else {
+        response.status(422);
         response.send("{}");
       }
     }
@@ -49,18 +52,21 @@ async function handle_transacao(request, response) {
 }
 
 async function handle_extrato(request, response) {
+  console.log("Extrato");
   let id = request.path_parameters.id;
   saida = {};
   hasTransacao = false;
+  http_status = 404;
   connection.query(
-    `SELECT * FROM transacoes WHERE cliente_id = ${id} order by data_hora_inclusao DESC limit 10`,
-    function (err, results, fields) {
+    `call DO_EXTRATO('${id}')`,
+    await function (err, results, fields) {
       if (err == null) {
-        if (results.length == 0) {
-          return;
+        if (results.length == 0 || results[0].length == 0 || results[0][0].length == 0) {
+          response.status(404).send(JSON.stringify(results));
         }
         for (i = 0; i < results.length; i++) {
           if (i == 0) {
+            http_status = results[i].p_http_status; 
             saida = {
               saldo: {
                 total: results[i].saldo,
@@ -78,37 +84,13 @@ async function handle_extrato(request, response) {
             realizada_em: results[i].data_hora_inclusao,
           });
         }
-
-        response.status(200).send(JSON.stringify(saida));
+        console.log("Extrato: " + JSON.stringify(saida));
+        response.status(http_status).send(JSON.stringify(saida));
       } else {
-        response.status(404).send("{}");
+        response.status(500).send(JSON.stringify(err));
       }
     }
-  );
-  if (!hasTransacao) {
-    connection.query(
-      `SELECT * FROM clientes WHERE cliente_id = ${id} limit 1`,
-      function (err, results, fields) {
-        if (err == null) {
-          if (results.length == 0) {
-            response.status(404).send("{}");
-            return;
-          }
-          saida = {
-            saldo: {
-              total: results[0].saldo,
-              data_extrato: new Date(),
-              limite: results[0].limite,
-            },
-            ultimas_transacoes: [],
-          };
-          response.status(200).send(JSON.stringify(saida));
-        } else {
-          response.status(404).send("{}");
-        }
-      }
-    );
-  }
+  );  
 }
 
 webserver.get("/", handle_index);
