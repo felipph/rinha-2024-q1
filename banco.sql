@@ -1,3 +1,6 @@
+drop database if exists rinha;
+create database rinha;
+
 use rinha;
 
 create table transacoes (
@@ -29,7 +32,7 @@ INSERT INTO clientes VALUES
     (5, 'Cliente 5', 500000,0);
 
 DROP PROCEDURE IF EXISTS DO_TRANS;
-
+DROP PROCEDURE IF EXISTS DO_EXTRATO;
 DELIMITER $$
 CREATE PROCEDURE  DO_TRANS(
     IN p_cliente_id int,
@@ -40,35 +43,37 @@ CREATE PROCEDURE  DO_TRANS(
 BEGIN
     DECLARE v_limite int signed;
     DECLARE v_saldo int signed;
-
+    DECLARE v_http_status int signed;
     DECLARE EXIT HANDLER FOR SQLEXCEPTION
     BEGIN
         GET DIAGNOSTICS CONDITION 1 @p1 = RETURNED_SQLSTATE, @p2 = MESSAGE_TEXT, @p3 = MYSQL_ERRNO;
-        SELECT @p1 as p_cod,@p2 as p_msg, '403' p_status;
+        SELECT @p1 as p_cod,@p2 as p_msg, @p3 as p_status, v_http_status as p_http_status;
     END;
+
+    SET v_http_status = 500;
 
     -- obtendo o saldo e o limite
     START TRANSACTION;
     SELECT saldo, limite into v_saldo, v_limite
      from clientes where cliente_id = p_cliente_id FOR UPDATE;
     if v_saldo is null then
+        set v_http_status = 404;
         SIGNAL SQLSTATE '45404'
-        SET MESSAGE_TEXT = 'Cliente nao encontrado',
-        MYSQL_ERRNO = 404;
+        SET MESSAGE_TEXT = 'Cliente nao encontrado';
     end if;
 
 
     if(p_tipo != 'c' AND p_tipo != 'd') then
-        SIGNAL SQLSTATE '45000'
-        SET MESSAGE_TEXT = 'transacao invalida',
-        MYSQL_ERRNO = 403;
+        set v_http_status = 422;
+        SIGNAL SQLSTATE '45422'
+        SET MESSAGE_TEXT = 'transacao invalida';
     end if;
 
     -- verificando se estoura o saldo
     if p_tipo = 'd' and v_saldo - p_valor < (v_limite * -1) then
-        SIGNAL SQLSTATE '45000'
-        SET MESSAGE_TEXT = 'transacao invalida',
-        MYSQL_ERRNO = 403;
+        set v_http_status = 422;
+        SIGNAL SQLSTATE '45422'
+        SET MESSAGE_TEXT = 'transacao invalida';
     end if;
 
     if p_tipo = 'c' then
@@ -84,5 +89,29 @@ BEGIN
     (p_cliente_id,abs( p_valor), p_descricao,p_tipo, v_saldo, v_limite, current_timestamp);
     COMMIT;
     SELECT 0 as p_cod, 'OK' as p_msg, 200 p_status, v_saldo saldo, v_limite limite ;
-END$$
+END $$
+
+CREATE PROCEDURE  DO_EXTRATO(
+    IN p_cliente_id int)
+BEGIN
+    declare v_http_status int(3) unsigned;
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        GET DIAGNOSTICS CONDITION 1 @p1 = RETURNED_SQLSTATE, @p2 = MESSAGE_TEXT, @p3 = MYSQL_ERRNO;
+        SELECT @p1 as p_cod,@p2 as p_msg, @p3 as p_status, v_http_status as p_http_status;
+    END;
+
+    set v_http_status = 404;
+
+    START TRANSACTION ;
+
+    SELECT IFNULL(T.LIMITE, C.LIMITE) AS LIMITE, IFNULL(T.SALDO,C.SALDO) AS SALDO,  VALOR, DESCRICAO,
+           TIPO, DATA_HORA_INCLUSAO, 200 as p_http_status FROM clientes C
+    LEFT JOIN transacoes T ON T.CLIENTE_ID = C.CLIENTE_ID
+    WHERE C.CLIENTE_ID = p_cliente_id
+    ORDER BY T.DATA_HORA_INCLUSAO DESC LIMIT 10;
+
+    commit;
+
+END $$
 delimiter ;
