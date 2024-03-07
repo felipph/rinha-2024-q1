@@ -3,6 +3,11 @@ create database rinha;
 
 use rinha;
 
+CREATE USER 'rinha'@'%' IDENTIFIED BY 'SuperPass@@';
+
+grant all privileges on rinha.* to 'rinha'@'%' with grant option;
+flush privileges;
+
 create table transacoes (
     cliente_id int,
     valor numeric not null,

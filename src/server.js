@@ -3,18 +3,18 @@ const webserver = new HyperExpress.Server({
   fast_buffers: true,
   fast_abort: true,
 });
-const mysql = require("mysql2");
+const mysql = require("mysql2/promise");
 
-const connection = mysql.createPool({
+const pool = mysql.createPool({
   host: "database",
-  user: "root",
-  password: "root",
+  user: "rinha",
+  password: "SuperPass@@",
   database: "rinha",
   waitForConnections: true,
-  connectionLimit: 20,
+  connectionLimit: 75,
   maxIdle: 10,
-  idleTimeout: 1000,
-  queueLimit: 20,
+  idleTimeout: 5000,
+  queueLimit: 5000,
 });
 
 function handle_index(request, response) {
@@ -47,8 +47,14 @@ async function handle_transacao(request, response) {
         response.status(422);
         response.send("{}");
       }
-    }
-  );
+    );
+  } catch (error) {
+    console.log(error)
+    await connection.rollback()
+    response.status(400).send(JSON.stringify(error))
+  } finally {
+    pool.releaseConnection()
+  }
 }
 
 async function handle_extrato(request, response) {

@@ -16,8 +16,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.35"
-          memory: "150MB"
+          cpus: "0.40"
+          memory: "80MB"
   api02:
     # Essa sintaxe reusa o que foi declarado em 'api01'.
     <<: *api 
@@ -38,8 +38,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.2"
-          memory: "50MB"
+          cpus: "0.1"
+          memory: "20MB"
   database:
     hostname: database
     image: mysql
@@ -48,14 +48,16 @@ services:
       - '3306:3306'
     volumes:
       - ./banco.sql:/docker-entrypoint-initdb.d/01-database.sql
+      - ./my.cnf:/etc/mysql/conf.d/my.cnf
     environment:
       - MYSQL_ROOT_PASSWORD=root
       - MYSQL_DATABASE=rinha
+      - MYSQL_ROOT_HOST=%
     deploy:
       resources:
         limits:
           cpus: "0.6"
-          memory: "200MB"
+          memory: "420MB"
 
 # networks:
 #   default:
