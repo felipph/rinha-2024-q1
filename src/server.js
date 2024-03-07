@@ -22,37 +22,30 @@ function handle_index(request, response) {
 }
 
 async function handle_transacao(request, response) {
+  console.log("Transacao");
   let id = request.path_parameters.id;
   body = await request.json();
-  if (typeof body.tipo == 'undefined' || body.tipo.length > 1) {
-    response.status(422).send("422");
-    return;
-  }
-  console.log(body)
+  console.log("Transacao: " + JSON.stringify(body));
   saida = {};
-  const connection = await pool.getConnection();
-  await connection.beginTransaction()
-  try {
-    await connection.query(
-      `call DO_TRANS('${id}', '${body.tipo}', '${body.valor}', '${body.descricao}')`,
-      function (err, results, fields) {
-        if (err) {
-          console.log(err);
-          response.status(500).send(JSON.stringify(err));
-          return;
-        }
+  connection.query(
+    `call DO_TRANS('${id}', '${body.tipo}', '${body.valor}', '${body.descricao}')`,
+    await function (err, results, fields) {
+      if(err) {
+        response.status(422).send('{}');
+        return;
+      }      
+      if (err == null && results.length > 0) {
         response.status(results[0][0].p_status);
-        if (err == null) {
-          saida =
-            '{"limite": ' +
-            results[0][0].limite +
-            ', "saldo": ' +
-            results[0][0].saldo +
-            "}";
-        }
-
-        console.log(saida)
-        response.send(saida)
+        saida =  '{"limite": ' +
+        results[0][0].limite +
+        ', "saldo": ' +
+        results[0][0].saldo +
+        "}";
+        response.send(saida);
+        console.log("Transacao: " + JSON.stringify(saida));
+      } else {
+        response.status(422);
+        response.send("{}");
       }
     );
   } catch (error) {
@@ -65,75 +58,45 @@ async function handle_transacao(request, response) {
 }
 
 async function handle_extrato(request, response) {
+  console.log("Extrato");
   let id = request.path_parameters.id;
   saida = {};
   hasTransacao = false;
-  const connection = await pool.getConnection();
-  await connection.beginTransaction()
-  try {
-    await connection.query(
-      `SELECT * FROM transacoes WHERE cliente_id = ${id} order by data_hora_inclusao DESC limit 10`,
-      await function (err, results, fields) {
-        if (err == null) {
-          if (results.length == 0) {
-            return;
-          }
-          for (i = 0; i < results.length; i++) {
-            if (i == 0) {
-              saida = {
-                saldo: {
-                  total: results[i].saldo,
-                  data_extrato: new Date(),
-                  limite: results[i].limite,
-                },
-                ultimas_transacoes: [],
-              };
-            }
-
-            saida.ultimas_transacoes.push({
-              valor: results[i].valor,
-              tipo: results[i].tipo,
-              descricao: results[i].descricao,
-              realizada_em: results[i].data_hora_inclusao,
-            });
-          }
-
-          response.status(200).send(JSON.stringify(saida));
-        } else {
-          response.status(500).send(JSON.stringify(err));
+  http_status = 404;
+  connection.query(
+    `call DO_EXTRATO('${id}')`,
+    await function (err, results, fields) {
+      if (err == null) {
+        if (results.length == 0 || results[0].length == 0 || results[0][0].length == 0) {
+          response.status(404).send(JSON.stringify(results));
         }
-      }
-    );
-    if (!hasTransacao) {
-      await connection.query(
-        `SELECT * FROM clientes WHERE cliente_id = ${id} limit 1`,
-        await function (err, results, fields) {
-          if (err == null) {
-            if (results.length == 0) {
-              response.status(404).send("{}");
-              return;
-            }
+        for (i = 0; i < results.length; i++) {
+          if (i == 0) {
+            http_status = results[i].p_http_status; 
             saida = {
               saldo: {
-                total: results[0].saldo,
+                total: results[i].saldo,
                 data_extrato: new Date(),
-                limite: results[0].limite,
+                limite: results[i].limite,
               },
               ultimas_transacoes: [],
             };
-            response.status(200).send(JSON.stringify(saida));
-          } else {
-            response.status(404).send("{}");
           }
+
+          saida.ultimas_transacoes.push({
+            valor: results[i].valor,
+            tipo: results[i].tipo,
+            descricao: results[i].descricao,
+            realizada_em: results[i].data_hora_inclusao,
+          });
         }
-      );
+        console.log("Extrato: " + JSON.stringify(saida));
+        response.status(http_status).send(JSON.stringify(saida));
+      } else {
+        response.status(500).send(JSON.stringify(err));
+      }
     }
-  } catch (error) {
-    await connection.rollback()
-    response.status(400).send(JSON.stringify(error))
-  } finally {
-    pool.releaseConnection()
-  }
+  );  
 }
 
 webserver.get("/", handle_index);
