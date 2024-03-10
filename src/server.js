@@ -2,12 +2,13 @@ const postgres = require('postgres');
 
 const connection = postgres('postgres://postgres:postgres@database:5432/rinha');
 
+connection`SELECT 1 `;
+
 function handle_index(request, response) {
   response.send("Hello World");
 }
 
 async function handle_extrato(request, response) {
-  console.log("Extrato")
   let id = request.path_parameters.id;
   try{
     result = await connection`CALL DO_EXTRATO(${id},'','');`
@@ -15,16 +16,21 @@ async function handle_extrato(request, response) {
     .type('json')
     .send(result[0].p_extrato);  
   } catch (e) {
-    console.log(e)
     response.status(422).json({});
   }  
 }
 async function handle_transacao(request, response) {
-  console.log("Transacao")
-  let id = request.path_parameters.id;  
+  let id = request.path_parameters.id;
+  
   try{
     body = await request.json();
     if(body == null) {
+      throw new Error("Sem corpo parseavel");
+    }
+    if(!Number.isInteger(body.valor)) {
+      throw new Error("Sem corpo parseavel");
+    }
+    if(body.descricao == null || body.descricao.trim().length == 0) {
       throw new Error("Sem corpo parseavel");
     }
   result = await connection`call do_trans(${id}::int, ${body.tipo}::char, ${body.valor}::int, ${body.descricao}::text , '', 1, 1);`
@@ -32,7 +38,6 @@ async function handle_transacao(request, response) {
     .type('json')
     .send('{ "saldo": ' + result[0].p_saldo + ', "limite": '+ result[0].p_limite + '}');  
   } catch (e) {
-    console.log(e)
     response.status(422).json({});
   }  
 }

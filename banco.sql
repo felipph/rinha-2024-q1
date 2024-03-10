@@ -4,8 +4,6 @@ create table transacoes (
     valor numeric not null,
     descricao varchar(10) not null,
     tipo char(1) not null,
-    saldo int not null,
-    limite int not null,
     data_hora_inclusao timestamp default NOW()
 );
 create table clientes (
@@ -27,6 +25,7 @@ INSERT INTO clientes VALUES
     (3, 'Cliente 3', 1000000,0),
     (4, 'Cliente 4', 10000000,0),
     (5, 'Cliente 5', 500000,0);
+
 
 
 create or replace procedure do_trans(
@@ -66,13 +65,15 @@ begin
             hint = 'Tente um valor menor';
     end if;
 
+
+
+    insert into transacoes(cliente_id, valor, descricao, tipo, data_hora_inclusao)
+    values (p_cliente_id, abs(p_valor), p_descricao, p_tipo,  current_timestamp);
+
     update clientes
     set saldo = saldo - p_valor
     where cliente_id = p_cliente_id
     returning saldo, limite into p_saldo, p_limite;
-
-    insert into transacoes(cliente_id, valor, descricao, tipo, saldo, limite, data_hora_inclusao)
-    values (p_cliente_id, abs(p_valor), p_descricao, p_tipo, p_saldo, p_limite, current_timestamp);
 
 
     p_http_cod := 200;
@@ -103,8 +104,8 @@ DECLARE
 BEGIN
     p_http_cod := '200';
 
-    for v_result in SELECT COALESCE(T.LIMITE, C.LIMITE) AS LIMITE,
-                           COALESCE(T.SALDO, C.SALDO)   AS SALDO,
+    for v_result in SELECT  C.LIMITE AS LIMITE,
+                            C.SALDO   AS SALDO,
                            VALOR,
                            DESCRICAO,
                            TIPO,
@@ -154,4 +155,3 @@ exception
         raise notice 'SQL error: % - %', SQLERRM, SQLSTATE;
 END
 $$
-
