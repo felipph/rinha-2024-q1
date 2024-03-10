@@ -1,33 +1,25 @@
-drop database if exists rinha;
-create database rinha;
-
-use rinha;
-
-CREATE USER 'rinha'@'%' IDENTIFIED BY 'SuperPass@@';
-
-grant all privileges on rinha.* to 'rinha'@'%' with grant option;
-flush privileges;
 
 create table transacoes (
     cliente_id int,
     valor numeric not null,
     descricao varchar(10) not null,
     tipo char(1) not null,
-    saldo int signed not null,
-    limite int signed not null,
+    saldo int not null,
+    limite int not null,
     data_hora_inclusao timestamp default NOW()
-) ENGINE = MyISAM;
+);
+create table clientes (
+    cliente_id int,
+    nome varchar(100) not null,
+    limite int not null,
+    saldo int  not null
+
+);
 
 create index transacoes_idx_cliente_id on transacoes (cliente_id);
 create index transacoes_idx_data_hora_inclusao on transacoes (data_hora_inclusao);
 
-create table clientes (
-    cliente_id int not null primary key auto_increment,
-    nome varchar(100) not null,
-    limite int signed not null,
-    saldo int signed not null
 
-) ENGINE = MyISAM;
 
 INSERT INTO clientes VALUES
     (1, 'Cliente 1', 100000,0),
@@ -36,87 +28,130 @@ INSERT INTO clientes VALUES
     (4, 'Cliente 4', 10000000,0),
     (5, 'Cliente 5', 500000,0);
 
-DROP PROCEDURE IF EXISTS DO_TRANS;
-DROP PROCEDURE IF EXISTS DO_EXTRATO;
-DELIMITER $$
-CREATE PROCEDURE  DO_TRANS(
+
+create or replace procedure do_trans(
     IN p_cliente_id int,
     IN p_tipo char,
-    IN p_valor int signed,
-    IN p_descricao text
+    IN p_valor int,
+    IN p_descricao text,
+    out p_http_cod char(3),
+    out p_saldo int,
+    out p_limite int
 )
-BEGIN
-    DECLARE v_limite int signed;
-    DECLARE v_saldo int signed;
-    DECLARE v_http_status int signed;
-    DECLARE EXIT HANDLER FOR SQLEXCEPTION
-    BEGIN
-        GET DIAGNOSTICS CONDITION 1 @p1 = RETURNED_SQLSTATE, @p2 = MESSAGE_TEXT, @p3 = MYSQL_ERRNO;
-        SELECT @p1 as p_cod,@p2 as p_msg, @p3 as p_status, v_http_status as p_http_status;
-    END;
+    language plpgsql
+as
+$$
+DECLARE
+    v_count int;
 
-    SET v_http_status = 500;
+begin
+    SELECT saldo, limite
+    into p_saldo, p_limite
+    from clientes
+    where cliente_id = p_cliente_id FOR UPDATE;
 
-    -- obtendo o saldo e o limite
-    START TRANSACTION;
-    SELECT saldo, limite into v_saldo, v_limite
-     from clientes where cliente_id = p_cliente_id FOR UPDATE;
-    if v_saldo is null then
-        set v_http_status = 404;
-        SIGNAL SQLSTATE '45404'
-        SET MESSAGE_TEXT = 'Cliente nao encontrado';
-    end if;
-
-
-    if(p_tipo != 'c' AND p_tipo != 'd') then
-        set v_http_status = 422;
-        SIGNAL SQLSTATE '45422'
-        SET MESSAGE_TEXT = 'transacao invalida';
-    end if;
-
-    -- verificando se estoura o saldo
-    if p_tipo = 'd' and v_saldo - p_valor < (v_limite * -1) then
-        set v_http_status = 422;
-        SIGNAL SQLSTATE '45422'
-        SET MESSAGE_TEXT = 'transacao invalida';
+    if (p_tipo != 'c' AND p_tipo != 'd') then
+        raise exception 'Tipo inválido!';
     end if;
 
     if p_tipo = 'c' then
-        set p_valor = p_valor * -1;
+        p_valor := p_valor * -1;
     end if;
 
-    set v_saldo = v_saldo - p_valor;
-    -- persistindo a transacao e atualizando o saldo
+    if p_tipo = 'd' and p_saldo - p_valor < (p_limite * -1) then
+        p_http_cod := 422;
+        raise exception using
+            errcode = 'P0001',
+            message = 'Sem limite!',
+            hint = 'Tente um valor menor';
+    end if;
+
     update clientes
-        set saldo = saldo - p_valor
-    where cliente_id = p_cliente_id;
-    insert into transacoes(cliente_id, valor, descricao, tipo, saldo, limite, data_hora_inclusao) values
-    (p_cliente_id,abs( p_valor), p_descricao,p_tipo, v_saldo, v_limite, current_timestamp);
-    COMMIT;
-    SELECT 0 as p_cod, 'OK' as p_msg, 200 p_status, v_saldo saldo, v_limite limite ;
-END $$
+    set saldo = saldo - p_valor
+    where cliente_id = p_cliente_id
+    returning saldo, limite into p_saldo, p_limite;
 
-CREATE PROCEDURE  DO_EXTRATO(
-    IN p_cliente_id int)
+    insert into transacoes(cliente_id, valor, descricao, tipo, saldo, limite, data_hora_inclusao)
+    values (p_cliente_id, abs(p_valor), p_descricao, p_tipo, p_saldo, p_limite, current_timestamp);
+
+
+    p_http_cod := 200;
+
+exception
+    when no_data_found then
+        p_http_cod := 404;
+    when not_null_violation then
+        p_http_cod := 422;
+    when sqlstate 'P0001' then
+        p_http_cod := 422;
+    when others then
+        p_http_cod := 500;
+        raise notice 'SQL error: % - %', SQLERRM, SQLSTATE;
+end;
+$$;
+
+CREATE or replace PROCEDURE  DO_EXTRATO(
+    IN p_cliente_id int,
+    OUT p_http_cod char(3),
+    OUT p_extrato text)
+    language plpgsql
+as
+$$
+DECLARE
+    v_count  int := 0;
+    v_result record;
 BEGIN
-    declare v_http_status int(3) unsigned;
-    DECLARE EXIT HANDLER FOR SQLEXCEPTION
-    BEGIN
-        GET DIAGNOSTICS CONDITION 1 @p1 = RETURNED_SQLSTATE, @p2 = MESSAGE_TEXT, @p3 = MYSQL_ERRNO;
-        SELECT @p1 as p_cod,@p2 as p_msg, @p3 as p_status, v_http_status as p_http_status;
-    END;
+    p_http_cod := '200';
 
-    set v_http_status = 404;
+    for v_result in SELECT COALESCE(T.LIMITE, C.LIMITE) AS LIMITE,
+                           COALESCE(T.SALDO, C.SALDO)   AS SALDO,
+                           VALOR,
+                           DESCRICAO,
+                           TIPO,
+                           DATA_HORA_INCLUSAO
+                    FROM clientes C
+                             LEFT JOIN transacoes T ON T.CLIENTE_ID = C.CLIENTE_ID
+                    WHERE C.CLIENTE_ID = p_cliente_id
+                    ORDER BY T.DATA_HORA_INCLUSAO DESC
+                    LIMIT 10
+        loop
 
-    START TRANSACTION ;
+            if v_count = 0 then
+                p_extrato := '{"saldo": {
+                "total": ' || v_result.SALDO || ',
+                "data_extrato": "' || current_timestamp || '",
+                "limite": ' || v_result.LIMITE || '
+              },"ultimas_transacoes": [';
+            end if;
+            if v_result.valor is not null then
+                p_extrato := p_extrato || ' {
+                  "valor": ' || v_result.valor || ',
+                  "tipo": "' || v_result.tipo || '",
+                  "descricao": "' || v_result.descricao || '",
+                  "realizada_em": "' || v_result.data_hora_inclusao || '"
+                },';
+                v_count := v_count + 1;
+            end if;
 
-    SELECT IFNULL(T.LIMITE, C.LIMITE) AS LIMITE, IFNULL(T.SALDO,C.SALDO) AS SALDO,  VALOR, DESCRICAO,
-           TIPO, DATA_HORA_INCLUSAO, 200 as p_http_status FROM clientes C
-    LEFT JOIN transacoes T ON T.CLIENTE_ID = C.CLIENTE_ID
-    WHERE C.CLIENTE_ID = p_cliente_id
-    ORDER BY T.DATA_HORA_INCLUSAO DESC LIMIT 10;
 
-    commit;
+        end loop;
+    if (v_count > 0) then
+        p_extrato := trim(p_extrato, ',');
+    end if;
+    p_extrato := p_extrato || ']}';
+    IF(p_extrato IS NULL) THEN
+         raise exception no_data_found;
+    end if;
+exception
+    when no_data_found then
+        p_http_cod := 404;
+    when not_null_violation then
+        p_http_cod := 422;
+    when sqlstate 'P0002' then
+        p_http_cod := 422;
+    when others then
+        p_http_cod := 500;
+        raise notice 'SQL error: % - %', SQLERRM, SQLSTATE;
+END
+$$
 
-END $$
-delimiter ;

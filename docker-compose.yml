@@ -41,18 +41,18 @@ services:
           cpus: "0.1"
           memory: "20MB"
   database:
-    hostname: database
-    image: mysql
-    restart: always
-    ports:
-      - '3306:3306'
-    volumes:
-      - ./banco.sql:/docker-entrypoint-initdb.d/01-database.sql
-      - ./my.cnf:/etc/mysql/conf.d/my.cnf
+    image: postgres:latest
+    hostname: db
     environment:
-      - MYSQL_ROOT_PASSWORD=root
-      - MYSQL_DATABASE=rinha
-      - MYSQL_ROOT_HOST=%
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_USER=postgres
+      - POSTGRES_DB=rinha
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./banco.sql:/docker-entrypoint-initdb.d/01-create.sql
+    # command: postgres -c max_connections=20 -c log_error_verbosity='TERSE' -c log_min_error_statement='LOG' 
+    command: postgres -c max_connections=20 
     deploy:
       resources:
         limits:

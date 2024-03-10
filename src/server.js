@@ -1,108 +1,51 @@
-const HyperExpress = require("hyper-express");
-const webserver = new HyperExpress.Server({
-  fast_buffers: true,
-  fast_abort: true,
-});
-const mysql = require("mysql2/promise");
+const postgres = require('postgres');
 
-const pool = mysql.createPool({
-  host: "database",
-  user: "rinha",
-  password: "SuperPass@@",
-  database: "rinha",
-  waitForConnections: true,
-  connectionLimit: 75,
-  maxIdle: 10,
-  idleTimeout: 5000,
-  queueLimit: 5000,
-});
+const connection = postgres('postgres://postgres:postgres@database:5432/rinha');
 
 function handle_index(request, response) {
   response.send("Hello World");
 }
 
-async function handle_transacao(request, response) {
-  console.log("Transacao");
-  let id = request.path_parameters.id;
-  body = await request.json();
-  console.log("Transacao: " + JSON.stringify(body));
-  saida = {};
-  connection.query(
-    `call DO_TRANS('${id}', '${body.tipo}', '${body.valor}', '${body.descricao}')`,
-    await function (err, results, fields) {
-      if (err) {
-        response.status(422).send("{}");
-        return;
-      }
-      if (err == null && results.length > 0) {
-        response.status(results[0][0].p_status);
-        saida =
-          '{"limite": ' +
-          results[0][0].limite +
-          ', "saldo": ' +
-          results[0][0].saldo +
-          "}";
-        response.send(saida);
-        console.log("Transacao: " + JSON.stringify(saida));
-      } else {
-        response.status(422);
-        response.send("{}");
-      }
-    }
-  );
-}
-
 async function handle_extrato(request, response) {
-  console.log("Extrato");
   let id = request.path_parameters.id;
-  saida = {};
-  hasTransacao = false;
-  http_status = 404;
-  connection.query(
-    `call DO_EXTRATO('${id}')`,
-    await function (err, results, fields) {
-      if (err == null) {
-        if (
-          results.length == 0 ||
-          results[0].length == 0 ||
-          results[0][0].length == 0
-        ) {
-          response.status(404).send(JSON.stringify(results));
-        }
-        for (i = 0; i < results.length; i++) {
-          if (i == 0) {
-            http_status = results[i].p_http_status;
-            saida = {
-              saldo: {
-                total: results[i].saldo,
-                data_extrato: new Date(),
-                limite: results[i].limite,
-              },
-              ultimas_transacoes: [],
-            };
-          }
-
-          saida.ultimas_transacoes.push({
-            valor: results[i].valor,
-            tipo: results[i].tipo,
-            descricao: results[i].descricao,
-            realizada_em: results[i].data_hora_inclusao,
-          });
-        }
-        console.log("Extrato: " + JSON.stringify(saida));
-        response.status(http_status).send(JSON.stringify(saida));
-      } else {
-        response.status(500).send(JSON.stringify(err));
-      }
-    }
-  );
+  try{
+    result = await connection`CALL DO_EXTRATO(${id},'','');`
+    response.status(result[0].p_http_cod)
+    .type('json')
+    .send(result[0].p_extrato);  
+  } catch (e) {
+    console.log(e)
+    response.status(422).json({});
+  }  
 }
+async function handle_transacao(request, response) {
+  let id = request.path_parameters.id;  
+  try{
+    body = await request.json();
+    if(body == null) {
+      throw new Error("Sem corpo parseavel");
+    }
+  result = await connection`call do_trans(${id}::int, ${body.tipo}::char, ${body.valor}::int, ${body.descricao}::text , '', 1, 1);`
+    response.status(result[0].p_http_cod)
+    .type('json')
+    .send('{ saldo: ' + result[0].p_saldo + ', limite: '+ result[0].p_limite + '}');  
+  } catch (e) {
+    console.log(e)
+    response.status(422).json({});
+  }  
+}
+
+const HyperExpress = require("hyper-express");
+const webserver = new HyperExpress.Server({
+  fast_buffers: true,
+  fast_abort: true,
+});
 
 webserver.get("/", handle_index);
 webserver.post("/clientes/:id/transacoes", handle_transacao);
 webserver.get("/clientes/:id/extrato", handle_extrato);
 
-// Activate webserver by calling .listen(port, callback);
+// // Activate webserver by calling .listen(port, callback);
 webserver
   .listen(3000)
   .then((socket) => console.log("Webserver started on port 3000"))
