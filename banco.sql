@@ -17,7 +17,7 @@ create table clientes (
 );
 
 create index transacoes_idx_cliente_id on transacoes (cliente_id);
-create index transacoes_idx_data_hora_inclusao on transacoes (data_hora_inclusao);
+create index transacoes_idx_data_hora_inclusao on transacoes (data_hora_inclusao DESC);
 
 
 
@@ -85,7 +85,7 @@ exception
     when sqlstate 'P0001' then
         p_http_cod := 422;
     when others then
-        p_http_cod := 500;
+        p_http_cod := 422;
         raise notice 'SQL error: % - %', SQLERRM, SQLSTATE;
 end;
 $$;

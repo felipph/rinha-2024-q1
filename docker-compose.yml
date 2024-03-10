@@ -17,7 +17,7 @@ services:
       resources:
         limits:
           cpus: "0.40"
-          memory: "80MB"
+          memory: "60MB"
   api02:
     # Essa sintaxe reusa o que foi declarado em 'api01'.
     <<: *api 
@@ -57,7 +57,7 @@ services:
       resources:
         limits:
           cpus: "0.6"
-          memory: "420MB"
+          memory: "410M"
 
 # networks:
 #   default:
