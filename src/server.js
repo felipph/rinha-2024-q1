@@ -19,7 +19,7 @@ async function handle_extrato(request, response) {
             .type('json')
             .send(result[0].p_extrato);
     } catch (e) {
-        response.status(422).json({});
+        response.status(422).send("");
     }
 }
 
@@ -29,7 +29,7 @@ async function handle_transacao(request, response) {
     try {
         body = await request.json();
         if (body == null) {
-            response.status(422).json({});
+            response.status(422).send("");
             return;
         }
         result = await connection`call do_trans(${id}::int, ${body.tipo}::char, ${body.valor}::int, ${body.descricao}::text , '', 1, 1);`
