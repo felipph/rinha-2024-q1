@@ -1,5 +1,5 @@
-CREATE TABLESPACE data_tbs  LOCATION '/pgsql/data';
-CREATE TABLESPACE index_tbs LOCATION '/pgsql/index';
+-- CREATE TABLESPACE data_tbs  LOCATION '/pgsql/data';
+-- CREATE TABLESPACE index_tbs LOCATION '/pgsql/index';
 
 
 
@@ -10,7 +10,7 @@ create table transacoes (
     tipo char(1) not null,
     data_hora_inclusao timestamp default NOW()    
     
-) PARTITION BY RANGE (cliente_id) TABLESPACE data_tbs;
+) ;--PARTITION BY RANGE (cliente_id) --TABLESPACE data_tbs;
 
 
 create table clientes (
@@ -19,47 +19,47 @@ create table clientes (
     limite int not null,
     saldo int  not null    
     
-)PARTITION BY RANGE (cliente_id) TABLESPACE data_tbs;
+) ;--PARTITION BY RANGE (cliente_id) TABLESPACE data_tbs;
 
 
 
 
-create index transacoes_idx_cliente_id on transacoes (cliente_id) TABLESPACE index_tbs;
-create index transacoes_idx_data_hora_inclusao on transacoes (data_hora_inclusao) TABLESPACE index_tbs;
+create index transacoes_idx_cliente_id on transacoes (cliente_id) ;--TABLESPACE index_tbs;
+create index transacoes_idx_data_hora_inclusao on transacoes (data_hora_inclusao DESC);-- TABLESPACE index_tbs;
 
 
-CREATE TABLE transacoes_1 PARTITION OF transacoes
-FOR VALUES FROM (1) TO (2);
-CREATE TABLE transacoes_2 PARTITION OF transacoes
-FOR VALUES FROM (2) TO (3);
-CREATE TABLE transacoes_3 PARTITION OF transacoes
-FOR VALUES FROM (3) TO (4);
-CREATE TABLE transacoes_4 PARTITION OF transacoes
-FOR VALUES FROM (4) TO (5);
-CREATE TABLE transacoes_5 PARTITION OF transacoes
-FOR VALUES FROM (5) TO (6);
+-- CREATE TABLE transacoes_1 PARTITION OF transacoes
+-- FOR VALUES FROM (1) TO (2);
+-- CREATE TABLE transacoes_2 PARTITION OF transacoes
+-- FOR VALUES FROM (2) TO (3);
+-- CREATE TABLE transacoes_3 PARTITION OF transacoes
+-- FOR VALUES FROM (3) TO (4);
+-- CREATE TABLE transacoes_4 PARTITION OF transacoes
+-- FOR VALUES FROM (4) TO (5);
+-- CREATE TABLE transacoes_5 PARTITION OF transacoes
+-- FOR VALUES FROM (5) TO (6);
 
-CREATE TABLE clientes_1 PARTITION OF clientes
-FOR VALUES FROM (1) TO (2);
-CREATE TABLE clientes_2 PARTITION OF clientes
-FOR VALUES FROM (2) TO (3);
-CREATE TABLE clientes_3 PARTITION OF clientes
-FOR VALUES FROM (3) TO (4);
-CREATE TABLE clientes_4 PARTITION OF clientes
-FOR VALUES FROM (4) TO (5);
-CREATE TABLE clientes_5 PARTITION OF clientes
-FOR VALUES FROM (5) TO (6);
+-- CREATE TABLE clientes_1 PARTITION OF clientes
+-- FOR VALUES FROM (1) TO (2);
+-- CREATE TABLE clientes_2 PARTITION OF clientes
+-- FOR VALUES FROM (2) TO (3);
+-- CREATE TABLE clientes_3 PARTITION OF clientes
+-- FOR VALUES FROM (3) TO (4);
+-- CREATE TABLE clientes_4 PARTITION OF clientes
+-- FOR VALUES FROM (4) TO (5);
+-- CREATE TABLE clientes_5 PARTITION OF clientes
+-- FOR VALUES FROM (5) TO (6);
 
-ALTER TABLE transacoes_1 SET (fillfactor = 90);
-ALTER TABLE transacoes_2 SET (fillfactor = 90);
-ALTER TABLE transacoes_3 SET (fillfactor = 90);
-ALTER TABLE transacoes_4 SET (fillfactor = 90);
-ALTER TABLE transacoes_5 SET (fillfactor = 90);
-ALTER TABLE clientes_1 SET (fillfactor = 90);
-ALTER TABLE clientes_2 SET (fillfactor = 90);
-ALTER TABLE clientes_3 SET (fillfactor = 90);
-ALTER TABLE clientes_4 SET (fillfactor = 90);
-ALTER TABLE clientes_5 SET (fillfactor = 90);
+-- ALTER TABLE transacoes_1 SET (fillfactor = 90);
+-- ALTER TABLE transacoes_2 SET (fillfactor = 90);
+-- ALTER TABLE transacoes_3 SET (fillfactor = 90);
+-- ALTER TABLE transacoes_4 SET (fillfactor = 90);
+-- ALTER TABLE transacoes_5 SET (fillfactor = 90);
+-- ALTER TABLE clientes_1 SET (fillfactor = 90);
+-- ALTER TABLE clientes_2 SET (fillfactor = 90);
+-- ALTER TABLE clientes_3 SET (fillfactor = 90);
+-- ALTER TABLE clientes_4 SET (fillfactor = 90);
+-- ALTER TABLE clientes_5 SET (fillfactor = 90);
 
 
 INSERT INTO clientes VALUES
@@ -94,6 +94,9 @@ begin
 
     if (p_tipo != 'c' AND p_tipo != 'd') then
         raise exception 'Tipo inválido!';
+    end if;
+    if (p_descricao is null OR trim(p_descricao) = '') then
+            raise exception 'Descricao inválida!';
     end if;
 
     if p_tipo = 'c' then
