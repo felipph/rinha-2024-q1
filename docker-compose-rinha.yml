@@ -14,7 +14,6 @@ services:
     environment:
       - PORT=3000
     image: felipph/nodejs-rinha24q1
-    build: .
     depends_on:
       - database
     command: node server.js
@@ -33,42 +32,19 @@ services:
   database:
     image: felipph/postgres-pgcenter:latest
     hostname: database
-    build: ./db-container/.
     network_mode: host
     environment:
       - POSTGRES_PASSWORD=postgres
       - POSTGRES_USER=postgres
       - POSTGRES_DB=rinha
-    ports:
-      - "5432:5432"
     volumes:
       - ./banco.sql:/docker-entrypoint-initdb.d/01-create.sql
-    # command: postgres -c max_connections=22 -c log_error_verbosity='TERSE' -c log_min_error_statement='LOG' -c shared_buffers=300MB -c effective_cache_size=350MB -c work_mem=10MB
     command: postgres -c max_connections=20
     deploy:
       resources:
         limits:
           cpus: "0.8"
           memory: "410M"
-#  proxy:
-#    hostname: proxy
-#    image: haproxy
-#    network_mode: host
-#    extra_hosts:
-#      - "api01:127.0.0.1"
-#      - "api02:127.0.0.1"
-#    restart: always
-#    volumes:
-#      - ./haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg
-#    depends_on:
-#      - api01
-#      - api02
-#    deploy:
-#      resources:
-#        limits:
-#          cpus: "0.3"
-#          memory: "30MB"
-
   proxy:
    hostname: proxy
    image: nginx:latest
