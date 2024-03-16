@@ -1,6 +1,8 @@
 const postgres = require('postgres');
 
-const connection = postgres('postgres://postgres:postgres@database:5432/rinha');
+const connection = postgres('postgres://postgres:postgres@database:5432/rinha', {
+  onnotice: (a) => {}
+});
 
 connection`SELECT 1 `;
 
@@ -25,20 +27,23 @@ async function handle_transacao(request, response) {
   try{
     body = await request.json();
     if(body == null) {
-      throw new Error("Sem corpo parseavel");
+      response.status(422).json({});
+      return;
     }
-    if(!Number.isInteger(body.valor)) {
-      throw new Error("Sem corpo parseavel");
+    if(!((typeof body.valor === 'number') && (body.valor % 1 === 0))) {
+      response.status(422).json({});
+      return;
     }
-    if(body.descricao == null || body.descricao.trim().length == 0) {
-      throw new Error("Sem corpo parseavel");
+    if(typeof body.descricao === "string" && body.descricao.length === 0) {
+      response.status(422).json({});
+      return;
     }
   result = await connection`call do_trans(${id}::int, ${body.tipo}::char, ${body.valor}::int, ${body.descricao}::text , '', 1, 1);`
     response.status(result[0].p_http_cod)
     .type('json')
     .send('{ "saldo": ' + result[0].p_saldo + ', "limite": '+ result[0].p_limite + '}');  
-  } catch (e) {
-    response.status(422).json({});
+  } catch (e) {    
+    response.status(422).send("");
   }  
 }
 

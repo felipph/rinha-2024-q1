@@ -13,8 +13,6 @@ create table transacoes (
 ) PARTITION BY RANGE (cliente_id) TABLESPACE data_tbs;
 
 
-
-
 create table clientes (
     cliente_id int,
     nome varchar(100) not null,
@@ -22,8 +20,12 @@ create table clientes (
     saldo int  not null    
     
 )PARTITION BY RANGE (cliente_id) TABLESPACE data_tbs;
+
+
+
+
 create index transacoes_idx_cliente_id on transacoes (cliente_id) TABLESPACE index_tbs;
-create index transacoes_idx_data_hora_inclusao on transacoes (data_hora_inclusao DESC) TABLESPACE index_tbs;
+create index transacoes_idx_data_hora_inclusao on transacoes (data_hora_inclusao) TABLESPACE index_tbs;
 
 
 CREATE TABLE transacoes_1 PARTITION OF transacoes
@@ -47,6 +49,17 @@ CREATE TABLE clientes_4 PARTITION OF clientes
 FOR VALUES FROM (4) TO (5);
 CREATE TABLE clientes_5 PARTITION OF clientes
 FOR VALUES FROM (5) TO (6);
+
+ALTER TABLE transacoes_1 SET (fillfactor = 90);
+ALTER TABLE transacoes_2 SET (fillfactor = 90);
+ALTER TABLE transacoes_3 SET (fillfactor = 90);
+ALTER TABLE transacoes_4 SET (fillfactor = 90);
+ALTER TABLE transacoes_5 SET (fillfactor = 90);
+ALTER TABLE clientes_1 SET (fillfactor = 90);
+ALTER TABLE clientes_2 SET (fillfactor = 90);
+ALTER TABLE clientes_3 SET (fillfactor = 90);
+ALTER TABLE clientes_4 SET (fillfactor = 90);
+ALTER TABLE clientes_5 SET (fillfactor = 90);
 
 
 INSERT INTO clientes VALUES
