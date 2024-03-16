@@ -2,7 +2,6 @@ version: '3'
 
 networks:
   rinha-network:
-    mode: host
 
 services:
   api01: &api
@@ -30,8 +29,9 @@ services:
       - "3001:3000"  
   
   database:
-    image: postgres:latest
-    hostname: db
+    image: felipph/postgres-pgcenter:latest
+    hostname: database
+    build: ./db-container/.
     networks:
       - rinha-network
     environment:
@@ -42,7 +42,7 @@ services:
       - "5432:5432"
     volumes:
       - ./banco.sql:/docker-entrypoint-initdb.d/01-create.sql
-    command: postgres -c max_connections=20 -c log_error_verbosity='TERSE' -c log_min_error_statement='LOG' -c shared_buffers=300MB -c effective_cache_size=350MB -c work_mem=10MB
+    command: postgres -c max_connections=22 -c log_error_verbosity='TERSE' -c log_min_error_statement='LOG' -c shared_buffers=300MB -c effective_cache_size=350MB -c work_mem=10MB
     #command: postgres -c max_connections=20 
     deploy:
       resources:

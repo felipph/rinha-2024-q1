@@ -1,22 +1,52 @@
+CREATE TABLESPACE data_tbs  LOCATION '/pgsql/data';
+CREATE TABLESPACE index_tbs LOCATION '/pgsql/index';
+
+
 
 create table transacoes (
     cliente_id int,
     valor numeric not null,
     descricao varchar(10) not null,
     tipo char(1) not null,
-    data_hora_inclusao timestamp default NOW()
-);
+    data_hora_inclusao timestamp default NOW()    
+    
+) PARTITION BY RANGE (cliente_id) TABLESPACE data_tbs;
+
+
+
+
 create table clientes (
     cliente_id int,
     nome varchar(100) not null,
     limite int not null,
-    saldo int  not null
+    saldo int  not null    
+    
+)PARTITION BY RANGE (cliente_id) TABLESPACE data_tbs;
+create index transacoes_idx_cliente_id on transacoes (cliente_id) TABLESPACE index_tbs;
+create index transacoes_idx_data_hora_inclusao on transacoes (data_hora_inclusao DESC) TABLESPACE index_tbs;
 
-);
 
-create index transacoes_idx_cliente_id on transacoes (cliente_id);
-create index transacoes_idx_data_hora_inclusao on transacoes (data_hora_inclusao DESC);
+CREATE TABLE transacoes_1 PARTITION OF transacoes
+FOR VALUES FROM (1) TO (2);
+CREATE TABLE transacoes_2 PARTITION OF transacoes
+FOR VALUES FROM (2) TO (3);
+CREATE TABLE transacoes_3 PARTITION OF transacoes
+FOR VALUES FROM (3) TO (4);
+CREATE TABLE transacoes_4 PARTITION OF transacoes
+FOR VALUES FROM (4) TO (5);
+CREATE TABLE transacoes_5 PARTITION OF transacoes
+FOR VALUES FROM (5) TO (6);
 
+CREATE TABLE clientes_1 PARTITION OF clientes
+FOR VALUES FROM (1) TO (2);
+CREATE TABLE clientes_2 PARTITION OF clientes
+FOR VALUES FROM (2) TO (3);
+CREATE TABLE clientes_3 PARTITION OF clientes
+FOR VALUES FROM (3) TO (4);
+CREATE TABLE clientes_4 PARTITION OF clientes
+FOR VALUES FROM (4) TO (5);
+CREATE TABLE clientes_5 PARTITION OF clientes
+FOR VALUES FROM (5) TO (6);
 
 
 INSERT INTO clientes VALUES
